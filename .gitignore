@@ -1,5 +1,19 @@
-.ipynb_checkpoints/
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Python cache artifacts
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+
+# Operating system files
 .DS_Store
+Thumbs.db
+
+# Data files (raw multi-megabyte CSVs)
 data/raw/*.csv
+data/processed/*.csv
+data/processed/*.parquet
