@@ -17,6 +17,7 @@ The analysis is descriptive and inferential rather than predictive. We use Pytho
 ## Data source
 
 The project uses the **Diabetes Health Indicators Dataset**, derived from the **CDC Behavioral Risk Factor Surveillance System (BRFSS) 2015** and distributed through Kaggle by Alex Teboul.
+https://www.kaggle.com/datasets/alexteboul/diabetes-health-indicators-dataset/data
 
 The source collection contains three related files:
 
