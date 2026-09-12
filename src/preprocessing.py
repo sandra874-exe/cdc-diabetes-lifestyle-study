@@ -2,11 +2,6 @@ import os
 import pandas as pd
 import numpy as np
 
-
-# ============================================================
-# 1. DATA QUALITY AUDIT
-# ============================================================
-
 def audit_dataset(df: pd.DataFrame, name: str) -> None:
     """
     Performs a comprehensive quality audit:
@@ -21,10 +16,8 @@ def audit_dataset(df: pd.DataFrame, name: str) -> None:
     print(f"DATA QUALITY AUDIT: {name}")
     print(f"{'=' * 70}")
 
-    # Basic structure
     print(f"\nDimensions: {df.shape[0]:,} rows × {df.shape[1]} columns")
 
-    # Missing values
     null_counts = df.isnull().sum()
     total_nulls = null_counts.sum()
 
@@ -34,7 +27,6 @@ def audit_dataset(df: pd.DataFrame, name: str) -> None:
         print("\nColumns with missing values:")
         print(null_counts[null_counts > 0])
 
-    # Duplicate rows
     duplicate_count = df.duplicated().sum()
 
     print(
@@ -43,13 +35,8 @@ def audit_dataset(df: pd.DataFrame, name: str) -> None:
         f"({duplicate_count / len(df) * 100:.2f}%)"
     )
 
-    # Data types
     print("\nData Types:")
     print(df.dtypes.value_counts())
-
-    # --------------------------------------------------------
-    # Valid BRFSS value ranges
-    # --------------------------------------------------------
 
     valid_ranges = {
         "Diabetes_binary": {0, 1},
@@ -118,11 +105,6 @@ def audit_dataset(df: pd.DataFrame, name: str) -> None:
     if not invalid_found:
         print("  No invalid coded values detected.")
 
-
-# ============================================================
-# 2. CLEAN INVALID VALUES
-# ============================================================
-
 def clean_invalid_values(df: pd.DataFrame) -> pd.DataFrame:
     """
     Applies BRFSS-compatible validity rules.
@@ -179,11 +161,9 @@ def clean_invalid_values(df: pd.DataFrame) -> pd.DataFrame:
             invalid_summary[column] = count
             df_clean.loc[invalid_mask, column] = np.nan
 
-    # --------------------------------------------------------
     # BMI
     # CDC BRFSS calculated BMI:
     # values <12 or >=100 are treated as missing
-    # --------------------------------------------------------
 
     if "BMI" in df_clean.columns:
 
@@ -210,11 +190,6 @@ def clean_invalid_values(df: pd.DataFrame) -> pd.DataFrame:
 
     return df_clean
 
-
-# ============================================================
-# 3. MEMORY OPTIMIZATION
-# ============================================================
-
 def downcast_types(df: pd.DataFrame) -> pd.DataFrame:
     """
     Reduces memory usage while preserving appropriate types.
@@ -224,8 +199,6 @@ def downcast_types(df: pd.DataFrame) -> pd.DataFrame:
         df.memory_usage(deep=True).sum()
         / (1024 ** 2)
     )
-
-    # Binary variables
     binary_cols = [
         "Diabetes_binary",
         "HighBP",
@@ -249,7 +222,6 @@ def downcast_types(df: pd.DataFrame) -> pd.DataFrame:
         if col in df.columns:
             df[col] = df[col].astype("Int8")
 
-    # Ordinal variables
     ordinal_cols = [
         "Diabetes_012",
         "GenHlth",
@@ -265,7 +237,6 @@ def downcast_types(df: pd.DataFrame) -> pd.DataFrame:
         if col in df.columns:
             df[col] = df[col].astype("Int8")
 
-    # BMI needs to support missing values
     if "BMI" in df.columns:
         df["BMI"] = df["BMI"].astype("float32")
 
@@ -287,27 +258,8 @@ def downcast_types(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-
-# ============================================================
-# 4. FEATURE ENGINEERING
-# ============================================================
-
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Creates project-defined composite variables.
-
-    Important:
-    These are analytical features created for this project,
-    not official clinical scores.
-    """
-
     df_feat = df.copy()
-
-    # --------------------------------------------------------
-    # 1. Obesity indicator
-    # CDC BMI threshold: >= 30
-    # --------------------------------------------------------
-
     df_feat["Is_Obese"] = pd.Series(
         np.where(
             df_feat["BMI"].notna(),
@@ -317,43 +269,15 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         index=df_feat.index
     ).astype("Int8")
 
-    # --------------------------------------------------------
-    # 2. Metabolic factor count
-    #
-    # Counts presence of:
-    # - High blood pressure
-    # - High cholesterol
-    # - Obesity
-    #
-    # This is a project-defined count, NOT a clinical score.
-    # --------------------------------------------------------
-
     df_feat["Metabolic_Factor_Count"] = (
         df_feat["HighBP"].astype("float") +
         df_feat["HighChol"].astype("float") +
         df_feat["Is_Obese"].astype("float")
     ).round().astype("Int8")
 
-    # --------------------------------------------------------
-    # 3. Non-smoker indicator
-    # --------------------------------------------------------
-
     df_feat["Non_Smoker"] = (
         1 - df_feat["Smoker"]
     ).astype("Int8")
-
-    # --------------------------------------------------------
-    # 4. Project-defined healthy habits index
-    #
-    # Components:
-    # - Physical activity
-    # - Fruit consumption
-    # - Vegetable consumption
-    # - Non-smoking
-    #
-    # Equal weighting is intentional and should be described
-    # as a project-defined exploratory index.
-    # --------------------------------------------------------
 
     df_feat["Healthy_Habits"] = (
         df_feat["PhysActivity"].astype("float") +
@@ -362,15 +286,6 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         df_feat["Non_Smoker"].astype("float")
     ).round().astype("Int8")
 
-    # --------------------------------------------------------
-    # 5. Combined health burden
-    #
-    # IMPORTANT:
-    # MentHlth and PhysHlth can overlap, so this is NOT the
-    # number of unique unhealthy days.
-    # It is simply a project-defined sum.
-    # --------------------------------------------------------
-
     df_feat["Combined_Health_Burden"] = (
         df_feat["MentHlth"].astype("float") +
         df_feat["PhysHlth"].astype("float")
@@ -378,29 +293,20 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return df_feat
 
-
-# ============================================================
-# 5. PROCESS ONE DATASET
-# ============================================================
-
 def process_file(filename: str, output_name: str):
-
     raw_path = os.path.join(
         "data",
         "raw",
         filename
     )
-
     processed_dir = os.path.join(
         "data",
         "processed"
     )
-
     os.makedirs(
         processed_dir,
         exist_ok=True
     )
-
     output_path = os.path.join(
         processed_dir,
         output_name
@@ -408,25 +314,14 @@ def process_file(filename: str, output_name: str):
 
     print(f"\n\nProcessing: {filename}")
 
-    # Load
     df = pd.read_csv(raw_path)
-
-    # Step 1: Audit raw data
     audit_dataset(
         df,
         filename
     )
-
-    # Step 2: Clean invalid values
     df = clean_invalid_values(df)
-
-    # Step 3: Optimize memory
     df = downcast_types(df)
-
-    # Step 4: Engineer project features
     df = engineer_features(df)
-
-    # Save
     df.to_csv(
         output_path,
         index=False
@@ -436,42 +331,23 @@ def process_file(filename: str, output_name: str):
         f"\n--> Saved curated file: "
         f"{output_path}"
     )
-
     print(
         f"Final dimensions: "
         f"{df.shape[0]:,} rows × "
         f"{df.shape[1]} columns"
     )
 
-
-# ============================================================
-# 6. PROCESS ALL DATASETS
-# ============================================================
-
 def run_all():
 
     file_manifest = [
-
-        # PRIMARY ANALYTICAL DATASET
-        # Preserves:
-        # 0 = No diabetes
-        # 1 = Prediabetes
-        # 2 = Diabetes
         (
             "diabetes_012_health_indicators_BRFSS2015.csv",
             "diabetes_progression_cleaned.csv"
         ),
-
-        # SECONDARY VALIDATION DATASET
-        # 0 = No diabetes
-        # 1 = Prediabetes or diabetes
         (
             "diabetes_binary_health_indicators_BRFSS2015.csv",
             "diabetes_full_cleaned.csv"
         ),
-
-        # MACHINE-LEARNING BENCHMARK
-        # Balanced 50/50 dataset
         (
             "diabetes_binary_5050split_health_indicators_BRFSS2015.csv",
             "diabetes_balanced_cleaned.csv"
@@ -479,20 +355,13 @@ def run_all():
     ]
 
     for raw_file, output_file in file_manifest:
-
         process_file(
             raw_file,
             output_file
         )
-
     print(
         "\n\nAll 3 datasets processed successfully."
     )
-
-
-# ============================================================
-# RUN
-# ============================================================
 
 if __name__ == "__main__":
     run_all()
